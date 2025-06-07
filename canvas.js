@@ -397,6 +397,13 @@ addEventListener("mousemove", (e) => {
     mouse.x = (e.x / window.innerWidth) * canvas.width;
 })
 
+addEventListener("touchmove", (e) => {
+    let touch = e.touches[0];
+    mouse.x = (touch.clientX / window.innerWidth) * canvas.width;
+    mouse.y = (touch.clientY / window.innerHeight) * canvas.height;
+    e.preventDefault();
+})
+
 addEventListener("mousedown", (e) => {
     hold = true;
     keys["KeyW"] = true;

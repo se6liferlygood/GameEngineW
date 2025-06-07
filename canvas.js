@@ -415,6 +415,9 @@ addEventListener("mouseup", (e) => {
 })
 
 addEventListener("touchstart", (e) => {
+    let touch = e.touches[0];
+    mouse.x = (touch.clientX / window.innerWidth) * canvas.width;
+    mouse.y = (touch.clientY / window.innerHeight) * canvas.height;
     hold = true;
     keys["KeyW"] = true;
 })

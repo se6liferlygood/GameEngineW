@@ -148,7 +148,7 @@ class player {
         this.apply = false;
         this.Vmax = 200;
         this.Fmax = 1000;
-        this.friction = this.Fmax/this.Vmax;
+        this.friction = (this.Fmax/this.Vmax)*(this.m/5);
         this.Pangle = 0; //player angle
         this.vcut = 0.05;
         this.timecheck = 1;
@@ -166,6 +166,7 @@ class player {
         if(this.Pangle > 2*Math.PI) {
             this.Pangle = 2*Math.PI - this.Pangle;
         }
+        this.friction = (this.Fmax/this.Vmax)*(this.m/5);
         let fsize = this.friction*size(this.v);
         for(let i = 0; i <= 2; i++) {
             if(size(this.v) > 0) {

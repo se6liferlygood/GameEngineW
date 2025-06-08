@@ -362,10 +362,12 @@ var game = () => {
         player1.Pangle = Math.atan(p[1]/p[0])+(Math.PI*(p[0]<0));
     }
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(space < gspace) {
-        space += 0.05*(1000/fps)*tfactor
+    if(space < gspace-1) {
+        space += 0.05*(1000/fps)*tfactor;
+    } else if(space > gspace+1) {
+        space -= 0.05*(1000/fps)*tfactor;
     } else {
-        space = gspace
+        space = gspace;
     }
     DrawMap();
     player1.update((1000/fps)*tfactor)

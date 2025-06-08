@@ -4,8 +4,8 @@ canvas.height = 400;
 canvas.width = Math.round(canvas.height * (window.innerWidth / window.innerHeight));
 
 class stack {
-	constructor() {
-		this.array = [0];
+	constructor(start) {
+		this.array = [start];
 	}
 	push(x) {
 		this.array.push(x);
@@ -33,14 +33,17 @@ function RB(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
-var generateMaze = (marray) => {
-    for(let i = 0; i < marray.length; i++) {
-        for(let j = 0; j < marray[i].length; j++) {
+var generateMaze = (marray,min,max) => {
+    for(let i = min[0]; i <= max[0]; i++) {
+        if(marray[i] === undefined) {
+            marray[i] = new Map();
+        }
+        for(let j = min[1]; j <= max[1]; j++) {
             marray[i][j] = 1;
         }
     }
-    let mstackx = new stack();
-    let mstacky = new stack();
+    let mstackx = new stack(Math.round((max[0]+min[0])/2));
+    let mstacky = new stack(Math.round((max[1]+min[1])/2));
     let maze = 1;
     while(maze == 1) { //maze generation (recursive backtracking)
 		let went = 0;
@@ -52,7 +55,7 @@ var generateMaze = (marray) => {
 			let x = mstackx.peek();
 			switch(direction) {
 				case 1: //front
-					if(marray[x]?.[y - 2] !== 0 && y - 2 >= 0) {
+					if(marray[x]?.[y - 2] !== 0 && y - 2 >= min[1]) {
 						mstacky.push(y - 2);
 						mstackx.push(x);
 						marray[x][y - 1] = 0;
@@ -61,7 +64,7 @@ var generateMaze = (marray) => {
 					}
 				break;
 				case 2: //back
-					if(marray[x]?.[y + 2] !== 0 && y + 2 < marray[0].length) {
+					if(marray[x]?.[y + 2] !== 0 && y + 2 <= max[1]) {
 						mstacky.push(y + 2);
 						mstackx.push(x);
 						marray[x][y + 1] = 0;
@@ -70,7 +73,7 @@ var generateMaze = (marray) => {
 					}
 				break;
 				case 3: //left
-					if(map[x - 2]?.[y] !== 0 && x - 2 >= 0) {
+					if(map[x - 2]?.[y] !== 0 && x - 2 >= min[0]) {
 						mstacky.push(y);
 						mstackx.push(x - 2);
 						marray[x - 1][y] = 0;
@@ -79,7 +82,7 @@ var generateMaze = (marray) => {
 					}
 				break;
 				case 4: //right
-					if(map[x + 2]?.[y] !== 0 && x + 2 < marray.length) {
+					if(map[x + 2]?.[y] !== 0 && x + 2 <= max[0]) {
 						mstacky.push(y);
 						mstackx.push(x + 2);
 						marray[x + 1][y] = 0;
@@ -134,8 +137,9 @@ var store = tfactor;
 
 class player {
 	constructor() {
-        let d = 2000;
-        this.pos = [Math.cos(Math.random()*2*Math.PI)*d,Math.sin(Math.random()*2*Math.PI)*d];
+        this.pos = [0,0];
+        this.mpos = [0,0];
+        this.cpos = [0,0];
         this.s = [0,0] //distance that will be added to pos array
         this.v = [0,0]; //m/s
         this.a = [0,0]; //m/(s^2)
@@ -152,7 +156,11 @@ class player {
         this.Pangle = 0; //player angle
         this.vcut = 0.05;
         this.timecheck = 1;
-        while(this.colisionCheck(gspace)) this.pos = [Math.cos(Math.random()*2*Math.PI)*d,Math.sin(Math.random()*2*Math.PI)*d];
+        this.noclip = false;
+        for(let i = 0; i <= 1; i++) {
+            this.mpos[i] = Math.round(this.pos[i]/space+(msize/2));
+            this.cpos[i] = Math.floor(this.mpos[i]/msize);
+        }
 	}
 	update(delta) {
         if(delta == 0) {
@@ -176,13 +184,14 @@ class player {
             this.a[i] = this.f[i] / this.m; //a = f/m
             this.s[i] = ((this.v[i] + (this.v[i]+this.a[i]*delta) )/2) * delta//s = ((v0+v)/2)*t, t is delta
             this.v[i] = this.v[i] + this.a[i]*delta//v = v0+at
+            this.pos[i] += this.s[i];
+            this.mpos[i] = Math.round(this.pos[i]/space+(msize/2));
+            this.cpos[i] = Math.floor(this.mpos[i]/msize);
             if(Math.abs(this.v[i]) < this.vcut) {
                 this.v[i] = 0;
             }
         }
-        this.pos[0] += this.s[0];
-        this.pos[1] += this.s[1];
-        this.colisionCheck(space);
+        if(!this.noclip) this.colisionCheck(space);
 	}
     colisionCheck(vspace) {
         let c = true;
@@ -192,7 +201,7 @@ class player {
                     if((Math.abs(i) == Math.abs(j) && l == 0) || (Math.abs(i) != Math.abs(j) && l != 0)) continue;
                     let x = Math.round((this.pos[0]+(this.m/2)*i)/vspace+(msize/2));
                     let y = Math.round((this.pos[1]+(this.m/2)*j)/vspace+(msize/2));
-                    if(x < 0 || x >= msize || y < 0 || y >= msize) {
+                    if(map[y]?.[x] === undefined) {
                         continue;
                     }
                     if(map[y][x] == 1) {
@@ -218,6 +227,9 @@ class player {
         ctx.fillText("a: ["+Math.round(this.a[0])+","+Math.round(this.a[1])+"], " + Math.round(distance(this.a[0],this.a[1],0,0)),0,40,canvas.width);
         ctx.fillText("v: ["+Math.round(this.v[0])+","+Math.round(this.v[1])+"], " + Math.round(distance(this.v[0],this.v[1],0,0)),0,50,canvas.width);
         ctx.fillText("pos: ["+Math.round(this.pos[0])+","+Math.round(this.pos[1])+"], " + Math.round(distance(this.pos[0],this.pos[1],0,0)),0,60,canvas.width);
+        ctx.fillText("mpos: ["+this.mpos[0]+","+this.mpos[1]+"], " + Math.round(distance(this.mpos[0],this.mpos[1],0,0)),0,70,canvas.width);
+        ctx.fillText("cpos: ["+this.cpos[0]+","+this.cpos[1]+"], " + Math.round(distance(this.cpos[0],this.cpos[1],0,0)),0,80,canvas.width);
+        ctx.fillText("GENERATED CELLS: " + generated,0,90,canvas.width);
         ctx.fillStyle = "green";
         RelativeDraw(this.pos[0],this.pos[1],this.m,this.m);
         ctx.globalAlpha = 0.5;
@@ -238,54 +250,35 @@ var RelativeDraw = (x,y,size) => {
     }
 }
 
-var map = [[]];
+var map = new Map();
+var cells = new Map();
 
-let msize = 2000;
-var space = 10;
-var gspace = 101
+let msize = 100;
+var space = 100;
+var gspace = 100;
 
-for(let i = 0; i < msize; i++) {
-    map.push([]);
-    for(let j = 0; j < msize; j++) {
-        map[i].push(0);
-    }
-}
-
-generateMaze(map);
+var generated = 0;
 
 var player1 = new player();
 
 var DrawMap = () => {
-    let startj = 0;
-    let starti = 0;
-    let ij = 1;
-    let ii = 1;
-    ctx.fillStyle = "grey";
-    for(let i = starti; i < canvas.width; i += ii) {
-        if(Math.round(Math.abs(player1.pos[0] + i)) % space == 0 || ii == space) {
-            ctx.fillRect(i,1,1,canvas.height);
-            if(ii == 1) { 
-                starti = i;
-                ii = space;
-            }
-        }
-        for(let j = startj; j < canvas.height; j += ij) {
-            if(Math.round(Math.abs(player1.pos[1] + j)) % space == 0 || ij == space) {
-                ctx.fillRect(1,j,canvas.width,1);
-                if(ij == 1) {
-                    startj = j;
-                    ij = space;
-                }
-            }
-        }
-    }
-    starti = Math.floor((player1.pos[1]-canvas.height-space)/space+(msize/2));
-    startj = Math.floor((player1.pos[0]-canvas.width-space)/space+(msize/2));
+    let starti = Math.floor((player1.pos[1]-canvas.height-space)/space+(msize/2));
+    let startj = Math.floor((player1.pos[0]-canvas.width-space)/space+(msize/2));
     let endi = Math.floor((player1.pos[1]+canvas.height+space)/space+(msize/2));
     let endj = Math.floor((player1.pos[0]+canvas.width+space)/space+(msize/2));
     for(let i = starti; i < endi; i++) {
         for(let j = startj; j < endj; j++) {
-            if(i < 0 || j < 0 || i >= msize || j >= msize) {
+            if(map[i]?.[j] === undefined) {
+                if(cells[Math.floor(i/msize)] === undefined) {
+                    cells[Math.floor(i/msize)] = new Map();
+                    cells[Math.floor(i/msize)][Math.floor(j/msize)] = 1;
+                    generateMaze(map,[Math.floor(i/msize)*msize,Math.floor(j/msize)*msize],[Math.floor(i/msize)*msize+msize,Math.floor(j/msize)*msize+msize]);
+                    generated++;
+                } else if(cells[Math.floor(i/msize)]?.[Math.floor(j/msize)] === undefined) {
+                    cells[Math.floor(i/msize)][Math.floor(j/msize)] = 1;
+                    generateMaze(map,[Math.floor(i/msize)*msize,Math.floor(j/msize)*msize],[Math.floor(i/msize)*msize+msize,Math.floor(j/msize)*msize+msize]);
+                    generated++;
+                }
                 continue;
             }
             let x = space*(j-(msize/2));

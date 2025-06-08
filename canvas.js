@@ -235,7 +235,6 @@ class player {
         ctx.globalAlpha = 0.5;
         drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle)*this.Fmax,this.pos[1]+Math.sin(this.Pangle)*this.Fmax,"red");
         ctx.globalAlpha = 1;
-        drawline(this.pos[0],this.pos[1],this.f[0] + this.pos[0],this.f[1] + this.pos[1],"grey");
     }
 }
 

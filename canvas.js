@@ -116,6 +116,7 @@ var generateMaze = (marray,min,max) => {
 	}
 }
 
+
 var distance = (x0,y0,x2,y2) => {
     //d=√((x_2-x_0)²+(y_2-y_0)²)
     return Math.sqrt((x2-x0)**2+(y2-y0)**2);
@@ -156,10 +157,13 @@ class player {
         this.Pangle = 0; //player angle
         this.vcut = 0.05;
         this.timecheck = 1;
+        this.rlength = 10;
         this.noclip = false;
+        this.FOV = Math.PI/2;
+        this.raycasting == false;
         for(let i = 0; i <= 1; i++) {
-            this.mpos[i] = Math.round(this.pos[i]/space+(msize/2));
-            this.cpos[i] = Math.floor(this.mpos[i]/msize);
+            this.mpos[i] = this.pos[i]/space+(msize/2);
+            this.cpos[i] = this.mpos[i]/msize;
         }
 	}
 	update(delta) {
@@ -185,32 +189,34 @@ class player {
             this.s[i] = ((this.v[i] + (this.v[i]+this.a[i]*delta) )/2) * delta//s = ((v0+v)/2)*t, t is delta
             this.v[i] = this.v[i] + this.a[i]*delta//v = v0+at
             this.pos[i] += this.s[i];
-            this.mpos[i] = Math.round(this.pos[i]/space+(msize/2));
-            this.cpos[i] = Math.floor(this.mpos[i]/msize);
+            this.mpos[i] = this.pos[i]/space+(msize/2);
+            this.cpos[i] = this.mpos[i]/msize;
             if(Math.abs(this.v[i]) < this.vcut) {
                 this.v[i] = 0;
             }
         }
-        if(!this.noclip) this.colisionCheck(space);
+        if(!this.noclip) this.colisionCheck(space,this.pos,false,this.m);
 	}
-    colisionCheck(vspace) {
+    colisionCheck(vspace,coords,ray,mass) {
         let c = true;
         for(let l = 0; l <= c; l++) {
             for(let i = -1; i <= 1; i++) {
                 for(let j = -1; j <= 1; j++) {
                     if((Math.abs(i) == Math.abs(j) && l == 0) || (Math.abs(i) != Math.abs(j) && l != 0)) continue;
-                    let x = Math.round((this.pos[0]+(this.m/2)*i)/vspace+(msize/2));
-                    let y = Math.round((this.pos[1]+(this.m/2)*j)/vspace+(msize/2));
+                    let x = Math.round((coords[0]+(mass/2)*i)/vspace+(msize/2));
+                    let y = Math.round((coords[1]+(mass/2)*j)/vspace+(msize/2));
                     if(map[y]?.[x] === undefined) {
                         continue;
                     }
                     if(map[y][x] == 1) {
                         c = false;
-                        if(i != 0 && ((this.v[0] > 0) == (i > 0))) {
-                            this.v[0] = this.v[0] * -1;
-                        }
-                        if(j != 0 && ((this.v[1] > 0) == (j > 0))) {
-                            this.v[1] = this.v[1] * -1;
+                        if(ray == false) {
+                            if(i != 0 && ((this.v[0] > 0) == (i > 0))) {
+                                this.v[0] = this.v[0] * -1;
+                            }
+                            if(j != 0 && ((this.v[1] > 0) == (j > 0))) {
+                                this.v[1] = this.v[1] * -1;
+                            }
                         }
                     }
                 }
@@ -220,20 +226,95 @@ class player {
             return true;
         } else return false;
     }
+    mapc(num,vspace) {return num/vspace+(msize/2)}
+    wall(acords) {
+        return this.colisionCheck(space,acords,true,1); //lazy
+    }
     draw() {
         ctx.fillStyle = "red";
         ctx.fillText("m: "+this.m,0,20,canvas.width);
-        ctx.fillText("F: ["+Math.round(this.f[0])+","+Math.round(this.f[1])+"], " + Math.round(distance(this.f[0],this.f[1],0,0)),0,30,canvas.width);
-        ctx.fillText("a: ["+Math.round(this.a[0])+","+Math.round(this.a[1])+"], " + Math.round(distance(this.a[0],this.a[1],0,0)),0,40,canvas.width);
-        ctx.fillText("v: ["+Math.round(this.v[0])+","+Math.round(this.v[1])+"], " + Math.round(distance(this.v[0],this.v[1],0,0)),0,50,canvas.width);
-        ctx.fillText("pos: ["+Math.round(this.pos[0])+","+Math.round(this.pos[1])+"], " + Math.round(distance(this.pos[0],this.pos[1],0,0)),0,60,canvas.width);
-        ctx.fillText("mpos: ["+this.mpos[0]+","+this.mpos[1]+"], " + Math.round(distance(this.mpos[0],this.mpos[1],0,0)),0,70,canvas.width);
-        ctx.fillText("cpos: ["+this.cpos[0]+","+this.cpos[1]+"], " + Math.round(distance(this.cpos[0],this.cpos[1],0,0)),0,80,canvas.width);
+        ctx.fillText("F: ["+Math.round(this.f[0])+","+Math.round(this.f[1])+"], " + Math.round(size(this.f)),0,30,canvas.width);
+        ctx.fillText("a: ["+Math.round(this.a[0])+","+Math.round(this.a[1])+"], " + Math.round(size(this.a)),0,40,canvas.width);
+        ctx.fillText("v: ["+Math.round(this.v[0])+","+Math.round(this.v[1])+"], " + Math.round(size(this.v)),0,50,canvas.width);
+        ctx.fillText("pos: ["+Math.round(this.pos[0])+","+Math.round(this.pos[1])+"], " + Math.round(size(this.pos)),0,60,canvas.width);
+        ctx.fillText("mpos: ["+Math.round(this.mpos[0])+","+Math.round(this.mpos[1])+"], " + Math.round(size(this.mpos)),0,70,canvas.width);
+        ctx.fillText("cpos: ["+Math.floor(this.cpos[0])+","+Math.floor(this.cpos[1])+"], " + Math.round(size(this.cpos)),0,80,canvas.width);
         ctx.fillText("GENERATED CELLS: " + generated,0,90,canvas.width);
         ctx.fillStyle = "green";
         RelativeDraw(this.pos[0],this.pos[1],this.m,this.m);
-        ctx.globalAlpha = 0.5;
-        drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle)*this.Fmax,this.pos[1]+Math.sin(this.Pangle)*this.Fmax,"red");
+
+        if(this.raycasting == true) {
+            for(let t = 0-this.FOV/2; t < this.FOV/2; t += Math.PI/50) {
+                let ray = [[this.mpos[0],this.mpos[1]],[this.mpos[0],this.mpos[1]]];
+                let rayn = [Math.cos(this.Pangle+t),Math.sin(this.Pangle+t)];
+                let rayv = [[1,rayn[1]/rayn[0]],[rayn[0]/rayn[1],1]];
+                for(let i = 0; i <= 1; i++) {
+                    if((rayn[0] < 0 && rayv[i][0] > 0) || (rayn[0] > 0 && rayv[i][0] < 0)) rayv[i][0] *= -1;
+                    if((rayn[1] < 0 && rayv[i][1] > 0) || (rayn[1] > 0 && rayv[i][1] < 0)) rayv[i][1] *= -1;
+                }
+                if(rayn[1] < 0) {
+                    ray[1][0] += rayv[1][0] * (ray[1][1] - Math.floor(ray[1][1])-0.5);
+                    ray[1][1] -= ray[1][1] - Math.floor(ray[1][1])-0.5;
+                } else {
+                    ray[1][0] += rayv[1][0] * (Math.ceil(ray[1][1]) - ray[1][1]-0.5);
+                    ray[1][1] += Math.ceil(ray[1][1]) - ray[1][1]-0.5;
+                }
+                if(rayn[0] < 0) {
+                    ray[0][1] += rayv[0][1] * (ray[0][0] - Math.floor(ray[0][0])-0.5);
+                    ray[0][0] -= ray[0][0] - Math.floor(ray[0][0])-0.5;
+                } else {
+                    ray[0][1] += rayv[0][1] * (Math.ceil(ray[0][0]) - ray[0][0]-0.5);
+                    ray[0][0] += Math.ceil(ray[0][0]) - ray[0][0]-0.5;
+                }
+                //let c = 0;
+                let compare = 0;
+                for(let a = 0; a <= 1; a++) {
+                    for(let k = 0; k < Math.ceil(this.rlength/size(rayv[a])); k++) {
+                        let apos = [space*(ray[a][0]-msize/2),space*(ray[a][1]-msize/2)];
+                        let check = ((apos[0]>this.pos[0])==(this.pos[0]+rayn[0]>this.pos[0])&&(apos[1]>this.pos[1])==(this.pos[1]+rayn[1]>this.pos[1]));
+                        /*
+                        if(check) {
+                            ctx.fillStyle = "red";
+                            RelativeDraw(apos[0],apos[1],3);
+                        }
+                        */
+                        if(check && this.wall(apos)) {
+                            //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"lime");
+                            compare = 1;
+                            let rx = space*(ray[0][0]-msize/2);
+                            let ry = space*(ray[0][1]-msize/2);
+                            if(distance(apos[0],apos[1],this.pos[0],this.pos[1]) < distance(rx,ry,this.pos[0],this.pos[1]) && a == 1) {
+                                //drawline(this.pos[0],this.pos[1],rx,ry,"red");
+                                drawline(this.pos[0],this.pos[1],apos[0],apos[1],"lime");
+                                RelativeDraw(apos[0],apos[1],3);
+                            } else if(a==1) {
+                                //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
+                                drawline(this.pos[0],this.pos[1],rx,ry,"yellow");
+                                RelativeDraw(rx,ry,3);
+                            }
+                            break;
+                        } else if(a==1&&compare==1&&k==Math.ceil(this.rlength/size(rayv[a]))-1) {
+                            let rx = space*(ray[0][0]-msize/2);
+                            let ry = space*(ray[0][1]-msize/2);
+                            //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
+                            drawline(this.pos[0],this.pos[1],rx,ry,"yellow");
+                            RelativeDraw(rx,ry,3);
+                        }
+                        for(let j = 0; j <= 1; j++) {
+                            ray[a][j] += rayv[a][j];
+                        }
+                        //c++;
+                    }
+                }
+                //console.log(c);
+            }
+            ctx.globalAlpha = 0.5;
+            drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle-this.FOV/2)*this.Fmax,this.pos[1]+Math.sin(this.Pangle-this.FOV/2)*this.Fmax,"red")
+            drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle+this.FOV/2)*this.Fmax,this.pos[1]+Math.sin(this.Pangle+this.FOV/2)*this.Fmax,"red")
+            } else {
+            ctx.globalAlpha = 0.5;
+        }
+        drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle)*this.Fmax,this.pos[1]+Math.sin(this.Pangle)*this.Fmax,"red")
         ctx.globalAlpha = 1;
     }
 }

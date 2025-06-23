@@ -157,10 +157,13 @@ class player {
         this.Pangle = 0; //player angle
         this.vcut = 0.05;
         this.timecheck = 1;
-        this.rlength = 10;
+        this.rlength = 20;
         this.noclip = false;
         this.FOV = Math.PI/2;
-        this.raycasting == false;
+        this.raycasting = false;
+        this.raydD = 50;
+        this.rays = 20;
+        this.Rdebug = false;
         for(let i = 0; i <= 1; i++) {
             this.mpos[i] = this.pos[i]/space+(msize/2);
             this.cpos[i] = this.mpos[i]/msize;
@@ -173,7 +176,7 @@ class player {
         } else if(this.timecheck == 0) {
             this.timecheck = 1;
             return 0;
-        } else if(space != gspace) return 0;
+        }
         delta /= 1000;
         if(this.Pangle > 2*Math.PI) {
             this.Pangle = 2*Math.PI - this.Pangle;
@@ -181,6 +184,9 @@ class player {
         this.friction = (this.Fmax*this.m)/(this.Vmax*5);
         let fsize = this.friction*size(this.v);
         for(let i = 0; i <= 2; i++) {
+            if(gspace != space) {
+                this.pos[i] = (this.mpos[i]-msize/2)*space;
+            }
             if(size(this.v) > 0) {
                 this.FF[i] = this.v[i] * (fsize/size(this.v));
             } else this.FF = [0,0];
@@ -188,15 +194,31 @@ class player {
             this.a[i] = this.f[i] / this.m; //a = f/m
             this.s[i] = ((this.v[i] + (this.v[i]+this.a[i]*delta) )/2) * delta//s = ((v0+v)/2)*t, t is delta
             this.v[i] = this.v[i] + this.a[i]*delta//v = v0+at
-            this.pos[i] += this.s[i];
-            this.mpos[i] = this.pos[i]/space+(msize/2);
-            this.cpos[i] = this.mpos[i]/msize;
             if(Math.abs(this.v[i]) < this.vcut) {
                 this.v[i] = 0;
             }
         }
-        if(!this.noclip) this.colisionCheck(space,this.pos,false,this.m);
+        if(!this.noclip && size(this.s) <= 1) {
+            this.colisionCheck(space,this.pos,false,this.m);
+        } else if(!this.noclip) { //colision check between frames
+            let ss = size(this.s); 
+            let ns = [this.s[0]/ss,this.s[1]/ss];
+            for(let i = 1; i <= ss; i++) { //this can get laggy if player is very fast but luckily there is a max speed and this game takes place in a maze
+                if(this.colisionCheck(space,[this.pos[0]+ns[0]*i,this.pos[1]+ns[1]*i],false,this.m)) {
+                    this.s = [ns[0]*i,ns[1]*i];
+                    break;
+                }
+            }
+        }
+        for(let i = 0; i <= 1; i++) {
+            this.pos[i] += this.s[i];
+            this.mpos[i] = this.pos[i]/space+(msize/2);
+            this.cpos[i] = this.mpos[i]/msize;
+        }
 	}
+    spacesync(vspace) {
+        for(let i = 0; i <= 1; i++) this.pos[i] = (this.mpos[i]-msize/2)*vspace;
+    }
     colisionCheck(vspace,coords,ray,mass) {
         let c = true;
         for(let l = 0; l <= c; l++) {
@@ -244,9 +266,17 @@ class player {
         RelativeDraw(this.pos[0],this.pos[1],this.m,this.m);
 
         if(this.raycasting == true) {
-            for(let t = 0-this.FOV/2; t < this.FOV/2; t += Math.PI/50) {
+            let screen = [[Math.cos(this.Pangle-this.FOV/2)*this.raydD,Math.sin(this.Pangle-this.FOV/2)*this.raydD],[Math.cos(this.Pangle+this.FOV/2)*this.raydD,Math.sin(this.Pangle+this.FOV/2)*this.raydD]];
+            for(let r = 0; r < this.rays; r++) {
+                let co = r/this.rays;
+                let screenv = [screen[0][0]+(screen[1][0]-screen[0][0])*co,screen[0][1]+(screen[1][1]-screen[0][1])*co];
+                ctx.fillStyle = "black";
+                RelativeDraw(this.pos[0]+screenv[0],this.pos[1]+screenv[1],3);
+                let t = Math.atan(screenv[1]/screenv[0])+(Math.PI*(screenv[0]<0));
+                if(t<Math.PI+0.1&&t>Math.PI-0.1) t -= 0.0001;
+                t += Math.PI*4;
                 let ray = [[this.mpos[0],this.mpos[1]],[this.mpos[0],this.mpos[1]]];
-                let rayn = [Math.cos(this.Pangle+t),Math.sin(this.Pangle+t)];
+                let rayn = [Math.cos(t),Math.sin(t)];
                 let rayv = [[1,rayn[1]/rayn[0]],[rayn[0]/rayn[1],1]];
                 for(let i = 0; i <= 1; i++) {
                     if((rayn[0] < 0 && rayv[i][0] > 0) || (rayn[0] > 0 && rayv[i][0] < 0)) rayv[i][0] *= -1;
@@ -272,23 +302,25 @@ class player {
                     for(let k = 0; k < Math.ceil(this.rlength/size(rayv[a])); k++) {
                         let apos = [space*(ray[a][0]-msize/2),space*(ray[a][1]-msize/2)];
                         let check = ((apos[0]>this.pos[0])==(this.pos[0]+rayn[0]>this.pos[0])&&(apos[1]>this.pos[1])==(this.pos[1]+rayn[1]>this.pos[1]));
-                        /*
-                        if(check) {
+                        
+                        
+                        if(check && this.Rdebug) {
                             ctx.fillStyle = "red";
                             RelativeDraw(apos[0],apos[1],3);
                         }
-                        */
-                        if(check && this.wall(apos)) {
-                            //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"lime");
+                        
+
+                        if(check&&this.wall(apos)) {
+                            if(this.Rdebug) drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
                             compare = 1;
                             let rx = space*(ray[0][0]-msize/2);
                             let ry = space*(ray[0][1]-msize/2);
                             if(distance(apos[0],apos[1],this.pos[0],this.pos[1]) < distance(rx,ry,this.pos[0],this.pos[1]) && a == 1) {
-                                //drawline(this.pos[0],this.pos[1],rx,ry,"red");
+                                if(this.Rdebug) drawline(this.pos[0],this.pos[1],rx,ry,"red");
                                 drawline(this.pos[0],this.pos[1],apos[0],apos[1],"lime");
                                 RelativeDraw(apos[0],apos[1],3);
                             } else if(a==1) {
-                                //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
+                                if(this.Rdebug) drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
                                 drawline(this.pos[0],this.pos[1],rx,ry,"yellow");
                                 RelativeDraw(rx,ry,3);
                             }
@@ -296,7 +328,7 @@ class player {
                         } else if(a==1&&compare==1&&k==Math.ceil(this.rlength/size(rayv[a]))-1) {
                             let rx = space*(ray[0][0]-msize/2);
                             let ry = space*(ray[0][1]-msize/2);
-                            //drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
+                            if(this.Rdebug) drawline(this.pos[0],this.pos[1],apos[0],apos[1],"red");
                             drawline(this.pos[0],this.pos[1],rx,ry,"yellow");
                             RelativeDraw(rx,ry,3);
                         }
@@ -308,24 +340,20 @@ class player {
                 }
                 //console.log(c);
             }
-            ctx.globalAlpha = 0.5;
             drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle-this.FOV/2)*this.Fmax,this.pos[1]+Math.sin(this.Pangle-this.FOV/2)*this.Fmax,"red")
             drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle+this.FOV/2)*this.Fmax,this.pos[1]+Math.sin(this.Pangle+this.FOV/2)*this.Fmax,"red")
-            } else {
-            ctx.globalAlpha = 0.5;
-        }
-        drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle)*this.Fmax,this.pos[1]+Math.sin(this.Pangle)*this.Fmax,"red")
-        ctx.globalAlpha = 1;
+            drawline(this.pos[0]+screen[0][0],this.pos[1]+screen[0][1],this.pos[0]+screen[1][0],this.pos[1]+screen[1][1],"red");
+        } else drawline(this.pos[0],this.pos[1],this.pos[0]+Math.cos(this.Pangle)*this.Fmax,this.pos[1]+Math.sin(this.Pangle)*this.Fmax,"red");
     }
 }
 
 var RelativeDraw = (x,y,size) => {
     let xx = Math.round(canvas.width/2 + (x - player1.pos[0]) - size/2)
     let yy = Math.round(canvas.height/2 + (y - player1.pos[1]) - size/2)
+    ctx.fillRect(xx,yy,size,size);
     if((xx < 0-size || xx > canvas.width+size) || (yy < 0-size || yy > canvas.height+size)) {
         return false
     } else {
-        ctx.fillRect(xx,yy,size,size);
         return true
     }
 }
@@ -342,10 +370,10 @@ var generated = 0;
 var player1 = new player();
 
 var DrawMap = () => {
-    let starti = Math.floor((player1.pos[1]-canvas.height-space)/space+(msize/2));
-    let startj = Math.floor((player1.pos[0]-canvas.width-space)/space+(msize/2));
-    let endi = Math.floor((player1.pos[1]+canvas.height+space)/space+(msize/2));
-    let endj = Math.floor((player1.pos[0]+canvas.width+space)/space+(msize/2));
+    let starti = Math.floor((player1.pos[1]-canvas.height-space*2)/space+(msize/2));
+    let startj = Math.floor((player1.pos[0]-canvas.width-space*2)/space+(msize/2));
+    let endi = Math.floor((player1.pos[1]+canvas.height+space*2)/space+(msize/2));
+    let endj = Math.floor((player1.pos[0]+canvas.width+space*2)/space+(msize/2));
     for(let i = starti; i < endi; i++) {
         for(let j = startj; j < endj; j++) {
             if(map[i]?.[j] === undefined) {
@@ -376,7 +404,7 @@ var DrawMap = () => {
 }
 
 
-var drawline = (x,y,x2,y2,color) => {
+var drawline = (x,y,x2,y2,color) => { //yeah there is a problem if the 2 points are outside the FOV but meh im lazy and dont have any reason to fix it right now. I could fix it if I did a bit of math and caluclated where x/y is in respect to x/y when they r at the border of FOV and then draw that if they r withing the FOV
     ctx.fillStyle = color;
     let d = distance(x,y,x2,y2);
     let kx = (x2-x)/d;
@@ -425,6 +453,10 @@ var checkKeys = (delta) => {
         }
 }
 
+var expandRate = 0.05;
+
+var spaceset = true;
+
 var start = performance.now();
 var fps = 1000/60;
 var hold = false;
@@ -436,15 +468,21 @@ var game = () => {
     }
     ctx.clearRect(0,0,canvas.width,canvas.height);
     if(space < gspace-1) {
-        space += 0.05*(1000/fps)*tfactor;
+        space += expandRate*(1000/fps)*tfactor;
+        spaceset = false;
     } else if(space > gspace+1) {
-        space -= 0.05*(1000/fps)*tfactor;
+        space -= expandRate*(1000/fps)*tfactor;
+        spaceset = false;
     } else {
         space = gspace;
+        if(!spaceset) {
+            player1.spacesync(space);
+            spaceset = true;
+        }
     }
+    player1.update((1000/fps)*tfactor);
     DrawMap();
-    player1.update((1000/fps)*tfactor)
-    player1.draw()
+    player1.draw();
     ctx.fillStyle = "red";
     ctx.fillText("FPS: " + Math.round(fps),0,10,canvas.width);
     fps = 1000/(performance.now()-start)
